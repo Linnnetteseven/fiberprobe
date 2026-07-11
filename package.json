@@ -16,6 +16,18 @@
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit"
   },
-  "keywords": ["fiber", "ckb", "nervos", "fnn", "payment-channel", "typescript", "sdk"],
-  "license": "MIT"
+  "keywords": [
+    "fiber",
+    "ckb",
+    "nervos",
+    "fnn",
+    "payment-channel",
+    "typescript",
+    "sdk"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "typescript": "^7.0.2"
+  }
 }

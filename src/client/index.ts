@@ -1,18 +1,19 @@
 /**
- * FiberClient — fully typed wrapper over the Fiber Network Node RPC.
+ * FiberClient — fully typed HTTP JSON-RPC client for Fiber Network Node (FNN).
  *
- * Replaces raw invokeCommand() calls (stringly typed, no autocomplete)
- * with a typed API that validates inputs and outputs at compile time.
+ * Communicates with a running FNN instance via its JSON-RPC endpoint
+ * (default: http://127.0.0.1:8227). Every method is typed against the
+ * official FNN RPC specification so callers get compile-time safety and
+ * inline documentation instead of raw invokeCommand() calls.
  *
  * @example
  * ```ts
- * const client = new FiberClient(fiber)
- * const channels = await client.listChannels()
- * const payment  = await client.sendPayment({ invoice: 'fibt...', dry_run: true })
+ * const client = new FiberClient('http://127.0.0.1:8227')
+ * const info    = await client.nodeInfo()
+ * console.log(info.pubkey, info.channel_count)
  * ```
  */
 
-import type { Fiber } from '@nervosnetwork/fiber-js'
 import type {
   Channel,
   Payment,
@@ -27,137 +28,167 @@ import type {
   Hash256,
 } from './types.js'
 
-export class FiberClient {
-  constructor(private readonly fiber: Fiber) {}
+// ── JSON-RPC transport ────────────────────────────────────────────────────────
 
-  // ── Node ─────────────────────────────────────────────────────────────────
+let requestId = 0
 
-  /** Returns identifying information about the running FNN node. */
-  async nodeInfo(): Promise<NodeInfo> {
-    return this.fiber.invokeCommand('node_info', [])
+/**
+ * Send a single JSON-RPC 2.0 request to the FNN node and return the result.
+ * Throws if the response contains a JSON-RPC error object.
+ *
+ * @param url    - Full HTTP URL of the FNN RPC endpoint
+ * @param method - JSON-RPC method name
+ * @param params - Method parameters (passed as the first array element per FNN convention)
+ */
+async function rpc<T>(url: string, method: string, params: unknown = {}): Promise<T> {
+  const id       = ++requestId
+  const response = await fetch(url, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ jsonrpc: '2.0', id, method, params: [params] }),
+  })
+
+  if (!response.ok) {
+    throw new Error(`FNN RPC HTTP error ${response.status}: ${response.statusText}`)
   }
 
-  // ── Peers ─────────────────────────────────────────────────────────────────
+  const json = await response.json() as { result?: T; error?: { code: number; message: string } }
+
+  if (json.error) {
+    throw new Error(`FNN RPC error [${json.error.code}]: ${json.error.message}`)
+  }
+
+  return json.result as T
+}
+
+// ── FiberClient ───────────────────────────────────────────────────────────────
+
+export class FiberClient {
+  /**
+   * @param rpcUrl - HTTP URL of the FNN RPC endpoint. Defaults to the standard
+   *                 local node address. Override for remote nodes or custom ports.
+   */
+  constructor(private readonly rpcUrl: string = 'http://127.0.0.1:8227') {}
+
+  // ── Node ───────────────────────────────────────────────────────────────────
+
+  /** Returns identifying information and operational stats for the running FNN node. */
+  async nodeInfo(): Promise<NodeInfo> {
+    return rpc<NodeInfo>(this.rpcUrl, 'node_info')
+  }
+
+  // ── Peers ──────────────────────────────────────────────────────────────────
 
   /** Lists all peers currently connected to this node. */
   async listPeers(): Promise<ListPeersResult> {
-    return this.fiber.invokeCommand('list_peers', [])
+    return rpc<ListPeersResult>(this.rpcUrl, 'list_peers')
   }
 
   /**
-   * Connects to a remote Fiber peer by address.
-   * @param address - Multiaddr of the remote peer, e.g. "/ip4/1.2.3.4/tcp/8228/p2p/..."
-   * @param save    - Persist this peer address for reconnection on restart. Defaults to true.
+   * Connects to a remote Fiber peer by multiaddr.
+   * @param address - Multiaddr of the remote peer
+   * @param save    - Persist this address for reconnection on restart
    */
   async connectPeer(address: string, save = true): Promise<void> {
-    return this.fiber.invokeCommand('connect_peer', [{ address, save }])
+    return rpc<void>(this.rpcUrl, 'connect_peer', { address, save })
   }
 
-  // ── Channels ──────────────────────────────────────────────────────────────
+  // ── Channels ───────────────────────────────────────────────────────────────
 
   /**
-   * Lists channels on this node, optionally filtered by peer.
-   * @param options.pubkey       - Filter to channels with a specific peer
-   * @param options.include_closed - Include closed channels in results. Defaults to false.
+   * Lists channels on this node, optionally filtered by peer pubkey.
+   * @param options.pubkey         - Filter to channels with a specific peer
+   * @param options.include_closed - Include closed channels. Defaults to false.
    */
   async listChannels(
     options: { pubkey?: string; include_closed?: boolean } = {}
   ): Promise<Channel[]> {
-    const result: ListChannelsResult = await this.fiber.invokeCommand(
-      'list_channels',
-      [options]
-    )
+    const result = await rpc<ListChannelsResult>(this.rpcUrl, 'list_channels', options)
     return result.channels
   }
 
   /**
    * Opens a new payment channel with a connected peer.
-   * The peer must already be connected via connectPeer().
-   *
-   * @param params.pubkey        - Peer to open the channel with
-   * @param params.funding_amount - CKB capacity to fund the channel (hex u128, in shannon)
-   * @param params.public         - Broadcast this channel to the network graph. Defaults to true.
+   * @param params.pubkey         - Peer pubkey to open the channel with
+   * @param params.funding_amount - CKB to lock in the channel (hex u128, shannon)
+   * @param params.public         - Announce to the network graph
    */
   async openChannel(params: {
-    pubkey:         string
-    funding_amount: string
-    public?:        boolean
+    pubkey:          string
+    funding_amount:  string
+    public?:         boolean
   }): Promise<{ temporary_channel_id: Hash256 }> {
-    return this.fiber.invokeCommand('open_channel', [params])
+    return rpc(this.rpcUrl, 'open_channel', params)
   }
 
   /**
-   * Initiates a cooperative shutdown of a channel.
-   * Both parties must be online for cooperative close. Use force=true only as a last resort.
-   *
-   * @param channel_id - The channel to close
-   * @param force      - Force-close unilaterally. Incurs a time-lock penalty. Defaults to false.
+   * Initiates cooperative shutdown of a channel.
+   * @param channel_id - Channel to close
+   * @param force      - Force-close unilaterally. Incurs a time-lock penalty.
    */
   async shutdownChannel(channel_id: Hash256, force = false): Promise<void> {
-    return this.fiber.invokeCommand('shutdown_channel', [{ channel_id, force }])
+    return rpc<void>(this.rpcUrl, 'shutdown_channel', { channel_id, force })
   }
 
-  // ── Payments ──────────────────────────────────────────────────────────────
+  // ── Payments ───────────────────────────────────────────────────────────────
 
   /**
-   * Sends a payment, or performs a dry-run feasibility check.
-   *
+   * Sends a payment or performs a dry-run feasibility check.
    * Set dry_run: true to validate routing and estimate fees without
-   * broadcasting the payment to the network.
+   * broadcasting the payment.
    */
   async sendPayment(params: SendPaymentParams): Promise<Payment> {
-    return this.fiber.invokeCommand('send_payment', [params])
+    return rpc<Payment>(this.rpcUrl, 'send_payment', params)
   }
 
   /**
-   * Fetches the current status and details of a payment by its hash.
+   * Fetches current status and details of a payment by its hash.
    * Poll this after sendPayment() to track Inflight → Success/Failed transitions.
    */
   async getPayment(payment_hash: Hash256): Promise<Payment> {
-    return this.fiber.invokeCommand('get_payment', [{ payment_hash }])
+    return rpc<Payment>(this.rpcUrl, 'get_payment', { payment_hash })
   }
 
   /**
    * Builds and validates a payment route without sending.
-   * Use this to inspect hop details and confirm a path exists.
+   * Use this to inspect hop details and confirm a path exists before committing.
    */
   async buildRouter(params: {
-    amount?:    string
-    hops_info:  { pubkey: string; channel_outpoint?: string }[]
+    amount?:   string
+    hops_info: { pubkey: string; channel_outpoint?: string }[]
   }): Promise<{ router_hops: RouterHop[] }> {
-    return this.fiber.invokeCommand('build_router', [params])
+    return rpc(this.rpcUrl, 'build_router', params)
   }
 
-  // ── Invoices ──────────────────────────────────────────────────────────────
+  // ── Invoices ───────────────────────────────────────────────────────────────
 
   /**
    * Creates a new Fiber invoice for receiving a payment.
    * @param params.amount   - Amount in shannon (hex u128)
-   * @param params.currency - Network: Fibb (mainnet), Fibt (testnet), Fibd (devnet)
+   * @param params.currency - Fibb (mainnet) | Fibt (testnet) | Fibd (devnet)
    */
   async newInvoice(params: NewInvoiceParams): Promise<InvoiceResult> {
-    return this.fiber.invokeCommand('new_invoice', [params])
+    return rpc<InvoiceResult>(this.rpcUrl, 'new_invoice', params)
   }
 
   /** Fetches an invoice and its current payment status by payment hash. */
   async getInvoice(payment_hash: Hash256): Promise<InvoiceResult> {
-    return this.fiber.invokeCommand('get_invoice', [{ payment_hash }])
+    return rpc<InvoiceResult>(this.rpcUrl, 'get_invoice', { payment_hash })
   }
 
   /** Cancels an Open invoice, preventing it from being paid. */
   async cancelInvoice(payment_hash: Hash256): Promise<InvoiceResult> {
-    return this.fiber.invokeCommand('cancel_invoice', [{ payment_hash }])
+    return rpc<InvoiceResult>(this.rpcUrl, 'cancel_invoice', { payment_hash })
   }
 
-  // ── Network Graph ─────────────────────────────────────────────────────────
+  // ── Network Graph ──────────────────────────────────────────────────────────
 
   /**
-   * Fetches public channels from the network graph.
+   * Fetches public channels from the Fiber network graph.
    * Used by PaymentChecker to score route liquidity during canPay() analysis.
-   *
    * @param limit - Maximum channels to return. Defaults to 100.
    */
   async graphChannels(limit = 100): Promise<GraphChannelsResult> {
-    return this.fiber.invokeCommand('graph_channels', [{ limit }])
+    return rpc<GraphChannelsResult>(this.rpcUrl, 'graph_channels', { limit })
   }
 }
