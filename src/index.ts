@@ -33,3 +33,13 @@ export type {
   CanReceiveParams, ReceiveCheckResult,
   ChannelCapacityEntry,
 }                                        from './payment/checker.js'
+
+export { FiberEventEmitter }             from './payment/events.js'
+
+export type {
+  WatchPaymentOptions,
+  WatchInvoiceOptions,
+  WatchChannelOptions,
+  BackoffProfile,
+  CancelFn,
+}                                        from './payment/events.js'
