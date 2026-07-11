@@ -310,7 +310,7 @@ export class PaymentChecker {
     let   total = 0n
 
     for (const ch of channels) {
-      if (ch.state !== 'ChannelReady') continue
+      if (ch.state.state_name !== 'ChannelReady') continue
 
       // Asset filter: match UDT or CKB channels based on udtTypeScriptHash presence
       const isUdtChannel = ch.funding_udt_type_script !== undefined

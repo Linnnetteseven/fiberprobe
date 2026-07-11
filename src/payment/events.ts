@@ -292,13 +292,13 @@ export class FiberEventEmitter {
         } else {
           lastChannel = channel
 
-          if (channel.state === 'ChannelReady') {
+          if (channel.state.state_name === 'ChannelReady') {
             options.onReady?.(channel)
             this.cleanup(watchId)
             return
           }
 
-          if (channel.state === 'Closed') {
+          if (channel.state.state_name === 'Closed') {
             options.onClosed?.(channel)
             this.cleanup(watchId)
             return

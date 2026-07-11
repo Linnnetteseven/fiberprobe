@@ -6,10 +6,7 @@
 export type Hash256 = string
 export type Pubkey  = string
 export type PeerId  = string
-
-// ── Channel ──────────────────────────────────────────────────────────────────
-
-export type ChannelState =
+export type ChannelStateName =
   | 'NegotiatingFunding'
   | 'CollaboratingFundingTx'
   | 'SigningCommitment'
@@ -19,23 +16,33 @@ export type ChannelState =
   | 'ShuttingDown'
   | 'Closed'
 
+/** Channel state as returned by the RPC: an object, not a bare string. */
+export interface ChannelState {
+  state_name:   ChannelStateName
+  state_flags?: string
+}
+
 export interface Channel {
-  channel_id:               Hash256
-  is_public:                boolean
-  channel_outpoint?:        string
-  pubkey:                   Pubkey
-  funding_udt_type_script?: object
-  state:                    ChannelState
-  local_balance:            string
-  remote_balance:           string
-  offered_tlc_balance:      string
-  received_tlc_balance:     string
-  pending_tlcs:             Htlc[]
-  created_at:               number
-  enabled:                  boolean
-  tlc_expiry_delta:         number
+  channel_id:                 Hash256
+  is_public:                  boolean
+  is_acceptor:                boolean
+  is_one_way:                 boolean
+  channel_outpoint?:          string
+  pubkey:                     Pubkey
+  funding_udt_type_script?:   object
+  state:                      ChannelState
+  local_balance:              string
+  remote_balance:             string
+  offered_tlc_balance:        string
+  received_tlc_balance:       string
+  pending_tlcs:               Htlc[]
+  latest_commitment_transaction_hash?: Hash256
+  created_at:                 string
+  enabled:                    boolean
+  tlc_expiry_delta:           number
   tlc_fee_proportional_millionths: string
   shutdown_transaction_hash?: Hash256
+  failure_detail?:            string | null
 }
 
 export interface Htlc {
