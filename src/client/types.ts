@@ -23,7 +23,7 @@ export interface Channel {
   channel_id:               Hash256
   is_public:                boolean
   channel_outpoint?:        string
-  peer_id:                  PeerId
+  pubkey:                   Pubkey
   funding_udt_type_script?: object
   state:                    ChannelState
   local_balance:            string
@@ -134,7 +134,7 @@ export interface GraphChannelsResult {
 
 export interface NodeInfo {
   version:       string
-  node_id:       Pubkey
+  pubkey:       Pubkey
   node_name?:    string
   addresses:     string[]
   channel_count: number
@@ -145,7 +145,6 @@ export interface NodeInfo {
 
 export interface PeerInfo {
   pubkey:  Pubkey
-  peer_id: PeerId
   address: string
 }
 

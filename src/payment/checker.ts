@@ -325,7 +325,7 @@ export class PaymentChecker {
 
       const entry: ChannelCapacityEntry = {
         channelId:     ch.channel_id,
-        peerId:        ch.peer_id,
+        peerId:        ch.pubkey,
         usableInbound: usable,
         isEnabled:     ch.enabled,
       }

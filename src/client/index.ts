@@ -57,11 +57,11 @@ export class FiberClient {
 
   /**
    * Lists channels on this node, optionally filtered by peer.
-   * @param options.peer_id       - Filter to channels with a specific peer
+   * @param options.pubkey       - Filter to channels with a specific peer
    * @param options.include_closed - Include closed channels in results. Defaults to false.
    */
   async listChannels(
-    options: { peer_id?: string; include_closed?: boolean } = {}
+    options: { pubkey?: string; include_closed?: boolean } = {}
   ): Promise<Channel[]> {
     const result: ListChannelsResult = await this.fiber.invokeCommand(
       'list_channels',
@@ -74,12 +74,12 @@ export class FiberClient {
    * Opens a new payment channel with a connected peer.
    * The peer must already be connected via connectPeer().
    *
-   * @param params.peer_id        - Peer to open the channel with
+   * @param params.pubkey        - Peer to open the channel with
    * @param params.funding_amount - CKB capacity to fund the channel (hex u128, in shannon)
    * @param params.public         - Broadcast this channel to the network graph. Defaults to true.
    */
   async openChannel(params: {
-    peer_id:        string
+    pubkey:         string
     funding_amount: string
     public?:        boolean
   }): Promise<{ temporary_channel_id: Hash256 }> {
