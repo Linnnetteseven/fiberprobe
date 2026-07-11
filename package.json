@@ -1,0 +1,21 @@
+{
+  "name": "fnn-ts",
+  "version": "0.1.0",
+  "description": "TypeScript SDK for Fiber Network Node (FNN) — typed RPC client, pre-flight payment checks, structured errors, and event-driven payment lifecycle.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit"
+  },
+  "keywords": ["fiber", "ckb", "nervos", "fnn", "payment-channel", "typescript", "sdk"],
+  "license": "MIT"
+}
