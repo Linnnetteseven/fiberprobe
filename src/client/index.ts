@@ -189,8 +189,11 @@ export class FiberClient {
    * Used by PaymentChecker to score route liquidity during canPay() analysis.
    * @param limit - Maximum channels to return. Defaults to 100.
    */
-  async graphChannels(limit = 100): Promise<GraphChannelsResult> {
-    return rpc<GraphChannelsResult>(this.rpcUrl, 'graph_channels', { limit: '0x' + limit.toString(16) })
+  async graphChannels(limit = 100, after?: string): Promise<GraphChannelsResult> {
+    return rpc<GraphChannelsResult>(this.rpcUrl, 'graph_channels', {
+      limit: '0x' + limit.toString(16),
+      ...(after !== undefined && { after }),
+    })
 
   }
 

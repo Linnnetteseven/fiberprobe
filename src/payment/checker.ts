@@ -145,6 +145,37 @@ function computeConfidence(hopScores: number[], hopCount: number): number {
  * most useful default for a payment router — fewer hops means fewer points
  * of failure and typically lower cumulative fees.
  */
+
+/**
+ * Fetches the entire public channel graph by paginating through graph_channels()
+ * until last_cursor stops changing or the safety cap is reached. Testnet graphs
+ * can exceed the default page size of any single call, so a naive single-page
+ * fetch can silently miss channels — including the caller's own, as discovered
+ * during live testing when a real ChannelReady channel was absent from the
+ * first 500-entry page.
+ *
+ * @param maxPages - Safety cap on number of pages fetched. Defaults to 20
+ *                   (i.e. up to 20 * limit channels).
+ */
+async function fetchAllGraphChannels(
+  client: FiberClient,
+  pageSize = 500,
+  maxPages = 20
+): Promise<GraphChannel[]> {
+  const all: GraphChannel[] = []
+  let cursor: string | undefined
+
+  for (let page = 0; page < maxPages; page++) {
+    const result = await client.graphChannels(pageSize, cursor)
+    all.push(...result.channels)
+
+    if (result.channels.length < pageSize) break
+    if (result.last_cursor === cursor) break
+    cursor = result.last_cursor
+  }
+
+  return all
+}
 function findPath(
   from: Pubkey,
   to: Pubkey,
@@ -293,11 +324,11 @@ export class PaymentChecker {
     }
 
     // Step 3: No direct channel — search the public graph
-    const graphResult = await this.client.graphChannels(500)
+    const allChannels = await fetchAllGraphChannels(this.client)
 
     // We need our own node's pubkey to start the search from
     const myNodeInfo = await this.client.nodeInfo()
-    const path = findPath(myNodeInfo.pubkey, destinationPubkey, graphResult.channels, maxHops)
+    const path = findPath(myNodeInfo.pubkey, destinationPubkey, allChannels, maxHops)
 
     if (!path) {
       return {
