@@ -30,6 +30,7 @@ export type {
 
 export type {
   CanPayParams, PaymentCheckResult,
+  ProbePayParams, ProbeResult,
   CanReceiveParams, ReceiveCheckResult,
   ChannelCapacityEntry,
 }                                        from './payment/checker.js'

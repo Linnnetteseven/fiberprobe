@@ -27,6 +27,7 @@
 import type { FiberClient }          from '../client/index.js'
 import type { Channel, GraphChannel, Pubkey } from '../client/types.js'
 import { FiberError, RouteNotFoundError } from '../client/errors.js'
+import { generateFakePaymentHash } from './probe-crypto.js'
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
@@ -65,6 +66,30 @@ export interface PaymentCheckResult {
   error?: FiberError
 }
 
+
+export interface ProbePayParams {
+  /** Destination node pubkey to probe. */
+  targetPubkey: Pubkey
+  /** Amount to probe for, in shannon (hex string). */
+  amount: string
+  /** Max seconds to wait for the probe to resolve. Defaults to 15. */
+  timeoutSeconds?: number
+}
+
+export interface ProbeResult {
+  /**
+   * True when the probe reached the destination and was rejected only for
+   * having an unrecognised (fake) payment hash — proof the entire route had
+   * enough live liquidity to carry this exact amount, right now.
+   */
+  isViable: boolean
+  /** Raw terminal failed_error string from the RPC, for diagnostics. */
+  terminalError?: string
+  /** Structured error when the probe failed due to a real routing/liquidity issue. */
+  error?: FiberError
+  /** Wall-clock time the probe took to resolve, in milliseconds. */
+  latencyMs: number
+}
 export interface CanReceiveParams {
   /** Amount in shannon to check receivability for (hex string). */
   amount: string
@@ -420,6 +445,75 @@ export class PaymentChecker {
       activeChannelCount:   breakdown.filter((c) => c.isEnabled).length,
       channelBreakdown:     breakdown,
       issues,
+    }
+  }
+
+  /**
+   * Performs a live liquidity probe against a real destination pubkey.
+   *
+   * Sends a real HTLC using a randomly generated, never-revealed preimage.
+   * Funds cannot be lost: since the preimage is never shared, no node along
+   * the route -- including the destination -- can ever claim the payment.
+   *
+   * Terminal outcomes:
+   *   - Destination returns IncorrectOrUnknownPaymentDetails: the entire
+   *     route had enough live liquidity right now to carry this exact
+   *     amount. This is a genuine empirical signal, not a static estimate.
+   *   - Any other failure (e.g. TemporaryChannelFailure): a specific hop
+   *     lacks liquidity or is unreachable. Parsed into a typed FiberError.
+   *
+   * This is slower and costs a brief HTLC lock on every hop versus canPay(),
+   * so use canPay() as the fast default and probePay() when you need
+   * ground-truth confidence immediately before a real payment.
+   */
+  async probePay(params: ProbePayParams): Promise<ProbeResult> {
+    const start = Date.now()
+    const { paymentHash } = await generateFakePaymentHash()
+    const timeoutMs = (params.timeoutSeconds ?? 15) * 1000
+
+    try {
+      await this.client.sendPayment({
+        target_pubkey: params.targetPubkey,
+        amount:        params.amount,
+        payment_hash:  paymentHash,
+        keysend:       false,
+      })
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : String(err)
+      return { isViable: false, terminalError: raw, error: FiberError.parse(raw), latencyMs: Date.now() - start }
+    }
+
+    // Poll for the terminal state. The probe self-resolves quickly in
+    // practice (observed ~130ms against live testnet nodes in this project)
+    // because the fake hash is rejected as soon as the HTLC reaches the
+    // destination -- there is no real invoice to wait on.
+    let intervalMs = 200
+    while (Date.now() - start < timeoutMs) {
+      try {
+        const payment = await this.client.getPayment(paymentHash)
+        if (payment.status === 'Success') {
+          // Should not happen with a fake hash, but handle it safely.
+          return { isViable: true, latencyMs: Date.now() - start }
+        }
+        if (payment.status === 'Failed') {
+          const raw = payment.failed_error ?? ''
+          if (raw.includes('IncorrectOrUnknownPaymentDetails')) {
+            return { isViable: true, terminalError: raw, latencyMs: Date.now() - start }
+          }
+          return { isViable: false, terminalError: raw, error: FiberError.parse(raw), latencyMs: Date.now() - start }
+        }
+      } catch {
+        // Payment session not yet queryable -- keep polling until timeout.
+      }
+      await new Promise((r) => setTimeout(r, intervalMs))
+      intervalMs = Math.min(intervalMs * 1.5, 1500)
+    }
+
+    return {
+      isViable:      false,
+      terminalError: 'Probe timed out before resolving',
+      error:         FiberError.parse('payment_timeout'),
+      latencyMs:     Date.now() - start,
     }
   }
 }

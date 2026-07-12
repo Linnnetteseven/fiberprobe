@@ -9,6 +9,7 @@ import type { NodeInfo, PaymentCheckResult, ReceiveCheckResult } from 'fnn-ts'
 
 const alice = new FiberClient('/rpc-alice')
 const bob   = new FiberClient('/rpc-bob')
+const carol = new FiberClient('/rpc-carol')
 const aliceChecker = new PaymentChecker(alice)
 const bobChecker   = new PaymentChecker(bob)
 
@@ -229,6 +230,7 @@ export default function App() {
   const [bobInfo, setBobInfo]     = useState<NodeInfo | null>(null)
 
   const [invoice, setInvoice]         = useState('')
+  const [recipient, setRecipient]     = useState<'bob' | 'carol'>('bob')
   const [payChecking, setPayChecking] = useState(false)
   const [payResult, setPayResult]     = useState<PaymentCheckResult | null>(null)
 
@@ -252,20 +254,21 @@ export default function App() {
   const handleGenerateInvoice = async () => {
     setGenerating(true)
     try {
-      const result = await bob.newInvoice({
+      const target = recipient === 'bob' ? bob : carol
+      const label = recipient === 'bob' ? 'Bob (direct channel)' : 'Carol (via Bob, 2 hops)'
+      const result = await target.newInvoice({
         amount: '0x3B9ACA00', // 10 CKB
         currency: 'Fibt',
-        description: 'fnn-ts demo payment',
+        description: `fnn-ts demo payment to ${recipient}`,
       })
       setInvoice(result.invoice_address)
-      pushLog('new_invoice', 'Bob generated a 10 CKB invoice', C.data)
+      pushLog('new_invoice', `${label} generated a 10 CKB invoice`, C.data)
     } catch (e) {
       pushLog('new_invoice', e instanceof Error ? e.message : String(e), C.bad)
     } finally {
       setGenerating(false)
     }
   }
-
   const handleCanPay = async () => {
     if (!invoice.trim()) return
     setPayChecking(true)
@@ -368,6 +371,33 @@ export default function App() {
             </p>
 
             <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => setRecipient('bob')}
+                style={{
+                  flex: 1, padding: '8px 10px', borderRadius: 6, cursor: 'pointer',
+                  fontFamily: C.mono, fontSize: 11.5, fontWeight: 600,
+                  background: recipient === 'bob' ? C.signal : 'transparent',
+                  color: recipient === 'bob' ? '#1a0e05' : C.muted,
+                  border: `1px solid ${recipient === 'bob' ? C.signal : C.border}`,
+                }}
+              >
+                → Bob (direct)
+              </button>
+              <button
+                onClick={() => setRecipient('carol')}
+                style={{
+                  flex: 1, padding: '8px 10px', borderRadius: 6, cursor: 'pointer',
+                  fontFamily: C.mono, fontSize: 11.5, fontWeight: 600,
+                  background: recipient === 'carol' ? C.signal : 'transparent',
+                  color: recipient === 'carol' ? '#1a0e05' : C.muted,
+                  border: `1px solid ${recipient === 'carol' ? C.signal : C.border}`,
+                }}
+              >
+                → Carol (2 hops)
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8 }}>
               <Field value={invoice} onChange={setInvoice} placeholder="fibt1… invoice address" />
               <div style={{ width: 140, flexShrink: 0 }}>
                 <Button onClick={handleGenerateInvoice} disabled={generating} variant="ghost">
@@ -375,7 +405,6 @@ export default function App() {
                 </Button>
               </div>
             </div>
-
             <Button onClick={handleCanPay} disabled={payChecking || !invoice.trim()}>
               {payChecking ? 'Checking route…' : 'Run canPay()'}
             </Button>

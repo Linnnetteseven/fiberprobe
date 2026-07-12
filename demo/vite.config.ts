@@ -21,6 +21,11 @@ export default defineConfig({
         rewrite: (p) => p.replace(/^\/rpc-bob/, ''),
         changeOrigin: true,
       },
+      '/rpc-carol': {
+        target: 'http://127.0.0.1:8247',
+        rewrite: (p) => p.replace(/^\/rpc-carol/, ''),
+        changeOrigin: true,
+      },
     },
   },
 })
