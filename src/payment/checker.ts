@@ -349,7 +349,7 @@ export class PaymentChecker {
     for (const ch of channels) {
       if (ch.state.state_name !== 'ChannelReady') continue
 
-      const isUdtChannel = ch.funding_udt_type_script !== undefined
+      const isUdtChannel = ch.funding_udt_type_script != null
       if (params.udtTypeScriptHash !== undefined && !isUdtChannel) continue
       if (params.udtTypeScriptHash === undefined  &&  isUdtChannel) continue
 
