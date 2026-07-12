@@ -73,3 +73,22 @@ main().catch((err) => {
   console.error('Test failed:', err)
   process.exit(1)
 })
+
+// ── Test 5: Multi-hop canPay (Alice -> Bob -> Carol) ─────────────────────────
+async function testMultiHop() {
+  console.log('\n[5] Multi-hop test: Alice has no direct channel to Carol')
+  const carolInvoice = process.argv[2]
+  if (!carolInvoice) {
+    console.log('    Skipped — pass Carol\'s invoice_address as an argument')
+    return
+  }
+  const result = await checker.canPay({ invoice: carolInvoice })
+  console.log(`    canPay: ${result.canPay}`)
+  console.log(`    Confidence: ${result.confidence}%`)
+  console.log(`    Destination: ${result.destinationPubkey?.slice(0, 20)}…`)
+  console.log(`    Hop count: ${result.hopCount}`)
+  if (result.issues.length) console.log(`    Issues: ${result.issues.join('; ')}`)
+  if (result.error) console.log(`    Error: ${result.error.code} — ${result.error.message}`)
+}
+
+testMultiHop().catch(console.error)

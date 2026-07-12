@@ -190,7 +190,7 @@ export class FiberClient {
    * @param limit - Maximum channels to return. Defaults to 100.
    */
   async graphChannels(limit = 100): Promise<GraphChannelsResult> {
-    return rpc<GraphChannelsResult>(this.rpcUrl, 'graph_channels', { limit })
+    return rpc<GraphChannelsResult>(this.rpcUrl, 'graph_channels', { limit: '0x' + limit.toString(16) })
 
   }
 

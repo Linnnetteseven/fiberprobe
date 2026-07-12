@@ -6,16 +6,19 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      // Import SDK directly from source — no build step needed for demo
       'fnn-ts': path.resolve(__dirname, '../src/index.ts'),
     },
   },
   server: {
     proxy: {
-      // Proxy /rpc/* to the local FNN node to avoid CORS
-      '/rpc': {
+      '/rpc-alice': {
         target: 'http://127.0.0.1:8227',
-        rewrite: (p) => p.replace(/^\/rpc/, ''),
+        rewrite: (p) => p.replace(/^\/rpc-alice/, ''),
+        changeOrigin: true,
+      },
+      '/rpc-bob': {
+        target: 'http://127.0.0.1:8237',
+        rewrite: (p) => p.replace(/^\/rpc-bob/, ''),
         changeOrigin: true,
       },
     },
