@@ -25,6 +25,7 @@ import type {
   GraphChannelsResult,
   NodeInfo,
   RouterHop,
+  ParseInvoiceResult,
   Hash256,
 } from './types.js'
 
@@ -190,5 +191,20 @@ export class FiberClient {
    */
   async graphChannels(limit = 100): Promise<GraphChannelsResult> {
     return rpc<GraphChannelsResult>(this.rpcUrl, 'graph_channels', { limit })
+
+  }
+
+  // ── Invoice Parsing ──────────────────────────────────────────────────────────
+
+  /**
+   * Parses an encoded Fiber invoice string without attempting payment.
+   * Extracts amount, payment_hash, and the destination pubkey (payee_public_key)
+   * from the attrs array. Used by PaymentChecker.canPay() to resolve the
+   * payment destination before running graph reachability analysis.
+   *
+   * @param invoice - The encoded invoice string (fibb.../fibt.../fibd...)
+   */
+  async parseInvoice(invoice: string): Promise<ParseInvoiceResult> {
+    return rpc<ParseInvoiceResult>(this.rpcUrl, 'parse_invoice', { invoice })
   }
 }

@@ -166,4 +166,26 @@ export interface RouterHop {
   channel_outpoint:    string
   amount_received:     string
   incoming_tlc_expiry: number
+}export interface ParsedInvoiceAttr {
+  description?: string
+  final_htlc_minimum_expiry_delta?: string
+  payee_public_key?: Pubkey
+  expiry?: string
+}
+
+export interface ParsedInvoiceData {
+  timestamp:    string
+  payment_hash: Hash256
+  attrs:        ParsedInvoiceAttr[]
+}
+
+export interface ParsedInvoice {
+  currency:  'Fibb' | 'Fibt' | 'Fibd'
+  amount:    string
+  signature: string
+  data:      ParsedInvoiceData
+}
+
+export interface ParseInvoiceResult {
+  invoice: ParsedInvoice
 }
