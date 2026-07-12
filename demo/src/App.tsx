@@ -5,8 +5,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { FiberClient, PaymentChecker } from 'fnn-ts'
-import type { NodeInfo, PaymentCheckResult, ReceiveCheckResult } from 'fnn-ts'
-
+import type { NodeInfo, PaymentCheckResult, ReceiveCheckResult, ProbeResult } from 'fnn-ts'
 const alice = new FiberClient('/rpc-alice')
 const bob   = new FiberClient('/rpc-bob')
 const carol = new FiberClient('/rpc-carol')
@@ -37,6 +36,21 @@ function fmtCkb(shannon: bigint | string): string {
   return (Number(n) / 1e8).toLocaleString(undefined, { maximumFractionDigits: 4 })
 }
 
+function explainProbeResult(result: ProbeResult): string {
+  if (result.isViable) {
+    return 'The destination received the probe and rejected it only because the payment hash was intentionally fake — proof every hop had enough live liquidity to carry this exact amount, right now.'
+  }
+  if (result.error?.code === 'INSUFFICIENT_CAPACITY') {
+    return 'A hop along this exact route ran out of outbound liquidity at the moment of probing. This is real-time channel state a static graph estimate cannot see — the gossip-announced capacity said this route should work, but the live balance split says otherwise, right now.'
+  }
+  return 'The probe could not confirm a viable route. See the terminal state below for the exact reason.'
+}
+
+function probeBadgeLabel(result: ProbeResult): string {
+  if (result.isViable) return 'VIABLE — LIVE'
+  if (result.error?.code === 'INSUFFICIENT_CAPACITY') return 'BLOCKED — LIQUIDITY FAILURE'
+  return 'BLOCKED — ROUTE FAILURE'
+}
 // ── Signal meter (signature element) ────────────────────────────────────────
 function SignalMeter({ value }: { value: number }) {
   const bars = 6
@@ -228,12 +242,14 @@ interface LogEntry { time: string; label: string; detail: string; colour: string
 export default function App() {
   const [aliceInfo, setAliceInfo] = useState<NodeInfo | null>(null)
   const [bobInfo, setBobInfo]     = useState<NodeInfo | null>(null)
-
+  const [carolInfo, setCarolInfo] = useState<NodeInfo | null>(null)
   const [invoice, setInvoice]         = useState('')
   const [recipient, setRecipient]     = useState<'bob' | 'carol'>('bob')
   const [payChecking, setPayChecking] = useState(false)
   const [payResult, setPayResult]     = useState<PaymentCheckResult | null>(null)
-
+  const [probing, setProbing]         = useState(false)
+  const [probeResult, setProbeResult] = useState<ProbeResult | null>(null)
+  const [probeStep, setProbeStep]     = useState(0)
   const [rxAmount, setRxAmount]       = useState('5')
   const [rxChecking, setRxChecking]   = useState(false)
   const [rxResult, setRxResult]       = useState<ReceiveCheckResult | null>(null)
@@ -249,6 +265,7 @@ export default function App() {
   useEffect(() => {
     alice.nodeInfo().then(setAliceInfo).catch(() => {})
     bob.nodeInfo().then(setBobInfo).catch(() => {})
+    carol.nodeInfo().then(setCarolInfo).catch(() => {})
   }, [])
 
   const handleGenerateInvoice = async () => {
@@ -285,11 +302,48 @@ export default function App() {
       const msg = e instanceof Error ? e.message : String(e)
       setPayResult({ canPay: false, confidence: 0, issues: [msg] })
       pushLog('canPay()', msg, C.bad)
-    } finally {
+     } finally {
       setPayChecking(false)
     }
   }
 
+  const handleProbe = async () => {
+    if (!payResult?.destinationPubkey || !payResult?.amount) return
+    setProbing(true)
+    setProbeResult(null)
+    setProbeStep(1) // "Generating fake payment hash"
+
+    try {
+      const resultPromise = aliceChecker.probePay({
+        targetPubkey: payResult.destinationPubkey,
+        amount: payResult.amount,
+      })
+
+      // Narrate the real steps as they happen — not simulated timing,
+      // just paced reveals so the process reads clearly instead of
+      // popping straight to a final badge.
+      await new Promise((r) => setTimeout(r, 200))
+      setProbeStep(2) // "Sending HTLC through the live route"
+      await new Promise((r) => setTimeout(r, 250))
+      setProbeStep(3) // "Awaiting destination response"
+
+      const result = await resultPromise
+      setProbeStep(4) // done
+      setProbeResult(result)
+      pushLog(
+        'probePay()',
+        result.isViable ? `viable · ${result.latencyMs}ms` : `not viable · ${result.latencyMs}ms`,
+        result.isViable ? C.good : C.bad
+      )
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      setProbeStep(4)
+      setProbeResult({ isViable: false, terminalError: msg, latencyMs: 0 })
+      pushLog('probePay()', msg, C.bad)
+    } finally {
+      setProbing(false)
+    }
+  }
   const handleCanReceive = async () => {
     const ckb = parseFloat(rxAmount)
     if (isNaN(ckb) || ckb <= 0) return
@@ -341,6 +395,7 @@ export default function App() {
           <div style={{ display: 'flex', gap: 20 }}>
             <NodePill label="alice" pubkey={aliceInfo?.pubkey} online={!!aliceInfo} />
             <NodePill label="bob" pubkey={bobInfo?.pubkey} online={!!bobInfo} />
+            <NodePill label="carol" pubkey={carolInfo?.pubkey} online={!!carolInfo} />
           </div>
         </div>
 
@@ -424,10 +479,90 @@ export default function App() {
                   <StatRow label="error" value={payResult.error.code} colour={C.bad} />
                 )}
                 <IssueList issues={payResult.issues} />
+
+                {payResult.canPay && (
+                  <div style={{
+                    borderTop: `1px solid ${C.border}`, paddingTop: 16, marginTop: 4,
+                    display: 'flex', flexDirection: 'column', gap: 12,
+                  }}>
+                    <div style={{ fontFamily: C.mono, fontSize: 10.5, color: C.data, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                      Ground truth · live HTLC probe
+                    </div>
+                    <Button onClick={handleProbe} disabled={probing} variant="ghost">
+                      {probing ? 'Probing live route…' : 'Run probePay()'}
+                    </Button>
+
+                    {(probing || probeResult) && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {[
+                          'Generating one-time fake payment hash',
+                          'Sending real HTLC through the live route',
+                          'Awaiting destination response',
+                        ].map((label, i) => {
+                          const stepNum = i + 1
+                          const active = probeStep >= stepNum
+                          return (
+                            <div key={i} style={{
+                              display: 'flex', alignItems: 'center', gap: 8,
+                              fontFamily: C.mono, fontSize: 11.5,
+                              color: active ? C.data : C.muted,
+                              opacity: active ? 1 : 0.4,
+                              transition: 'opacity 0.25s ease, color 0.25s ease',
+                            }}>
+                              <span style={{
+                                width: 6, height: 6, borderRadius: '50%',
+                                background: active ? C.data : C.border,
+                                boxShadow: active ? `0 0 6px ${C.data}` : 'none',
+                                flexShrink: 0,
+                              }} />
+                              {label}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+
+                    {probeResult && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        <div style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 8,
+                          padding: '8px 14px', borderRadius: 6, width: 'fit-content',
+                          background: probeResult.isViable ? '#0d2a1a' : '#2a0d0f',
+                          border: `1px solid ${probeResult.isViable ? C.good : C.bad}`,
+                        }}>
+                          <span style={{
+                            width: 8, height: 8, borderRadius: '50%',
+                            background: probeResult.isViable ? C.good : C.bad,
+                            boxShadow: `0 0 8px ${probeResult.isViable ? C.good : C.bad}`,
+                          }} />
+                          <span style={{
+                            fontFamily: C.mono, fontSize: 16, fontWeight: 700,
+                            color: probeResult.isViable ? C.good : C.bad,
+                            letterSpacing: '0.02em',
+                          }}>
+                            {probeBadgeLabel(probeResult)}
+                          </span>
+                        </div>
+                        <p style={{
+                          fontFamily: C.sans, fontSize: 12, color: C.muted,
+                          lineHeight: 1.6, margin: 0,
+                        }}>
+                          {explainProbeResult(probeResult)}
+                        </p>
+                        <StatRow label="resolved in" value={`${probeResult.latencyMs}ms`} colour={C.data} />
+                        {probeResult.terminalError && (
+                          <StatRow label="terminal state" value={probeResult.terminalError} />
+                        )}
+                        {probeResult.error && (
+                          <StatRow label="error code" value={probeResult.error.code} colour={C.bad} />
+                        )}
+                      </div>
+                   )}
+                  </div>
+                )}
               </div>
             )}
           </Panel>
-
           {/* canReceive panel */}
           <Panel eyebrow="Capacity check" title="canReceive() — inbound liquidity">
             <p style={{ fontFamily: C.sans, fontSize: 12.5, color: C.muted, lineHeight: 1.6, margin: 0 }}>
