@@ -107,7 +107,7 @@ function scoreHop(channel: GraphChannel, amountToForward: bigint): { score: numb
   const published = [
     channel.update_info_of_node1?.outbound_liquidity,
     channel.update_info_of_node2?.outbound_liquidity,
-  ].filter((l): l is string => l !== undefined)
+  ].filter((l): l is string => l != null)
 
   if (published.length === 0) {
     return { score: 0.70 }
