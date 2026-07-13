@@ -1,6 +1,6 @@
 {
   "name": "fiberprobe",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "TypeScript SDK for Fiber Network Node (FNN) — typed RPC client, static route estimation, live HTLC-based liquidity probing, inbound capacity checks, and event-driven payment lifecycle.",
   "type": "module",
   "main": "./dist/index.js",
@@ -33,11 +33,11 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Linnnetteseven/fnn-ts.git"
+    "url": "git+https://github.com/Linnnetteseven/fiberprobe.git"
   },
-  "homepage": "https://github.com/Linnnetteseven/fnn-ts#readme",
+  "homepage": "https://github.com/Linnnetteseven/fiberprobe#readme",
   "bugs": {
-    "url": "https://github.com/Linnnetteseven/fnn-ts/issues"
+    "url": "https://github.com/Linnnetteseven/fiberprobe/issues"
   },
   "author": "Linnette Mugwanja",
   "license": "MIT",
