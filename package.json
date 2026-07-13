@@ -1,7 +1,7 @@
 {
-  "name": "fnn-ts",
+  "name": "fiberprobe",
   "version": "0.1.0",
-  "description": "TypeScript SDK for Fiber Network Node (FNN) — typed RPC client, pre-flight payment checks, structured errors, and event-driven payment lifecycle.",
+  "description": "TypeScript SDK for Fiber Network Node (FNN) — typed RPC client, static route estimation, live HTLC-based liquidity probing, inbound capacity checks, and event-driven payment lifecycle.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -11,6 +11,9 @@
       "types": "./dist/index.d.ts"
     }
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
@@ -22,9 +25,21 @@
     "nervos",
     "fnn",
     "payment-channel",
+    "lightning",
+    "htlc",
     "typescript",
-    "sdk"
+    "sdk",
+    "probing"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Linnnetteseven/fnn-ts.git"
+  },
+  "homepage": "https://github.com/Linnnetteseven/fnn-ts#readme",
+  "bugs": {
+    "url": "https://github.com/Linnnetteseven/fnn-ts/issues"
+  },
+  "author": "Linnette Mugwanja",
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^26.1.1",
