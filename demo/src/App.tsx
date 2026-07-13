@@ -1,5 +1,5 @@
 /**
- * fnn-ts SDK Demo
+ * fiberprobe SDK Demo
  * Live against real FNN nodes: Alice (/rpc-alice -> 8227), Bob (/rpc-bob -> 8237), Carol (/rpc-carol -> 8247)
  */
 
@@ -412,7 +412,7 @@ export default function App() {
               fontFamily: C.mono, fontSize: 30, fontWeight: 700, color: C.signal,
               textShadow: `0 0 20px ${C.signal}66`, letterSpacing: '-0.01em', lineHeight: 1,
             }}>
-              fnn-ts
+              Fiber Probe
             </div>
             <div className="fnn-tagline" style={{ color: C.muted, fontSize: 13, marginTop: 6 }}>
               TypeScript SDK for Fiber Network Node · static estimate + live HTLC probing
@@ -677,9 +677,9 @@ export default function App() {
           fontFamily: C.mono, fontSize: 11, color: C.muted, flexWrap: 'wrap', gap: 8,
         }}>
           <span>Category 2 · Node, Routing &amp; Diagnostics · Gone in 60ms Hackathon</span>
-          <a href="https://github.com/Linnnetteseven/fnn-ts" target="_blank" rel="noreferrer"
+          <a href="https://github.com/Linnnetteseven/fiberprobe" target="_blank" rel="noreferrer"
              style={{ color: C.signal, textDecoration: 'none' }}>
-            github.com/Linnnetteseven/fnn-ts ↗
+            github.com/Linnnetteseven/fiberprobe ↗
           </a>
         </div>
       </div>

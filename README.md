@@ -1,8 +1,12 @@
-# fnn-ts
+# fiberprobe
 
 A TypeScript SDK for Fiber Network Node (FNN) that answers the question every payment-channel application eventually asks: **will this payment actually go through?**
 
 Built for the "Gone in 60ms" Fiber Network Infrastructure Hackathon, Category 2: Node, Routing & Diagnostics.
+
+````bash
+npm install fiberprobe
+```
 ---
 ## The problem
 
@@ -10,7 +14,7 @@ Fiber, like Lightning, splits channel state into two categories. Total capacity 
 
 The result is that no RPC can honestly answer "can I pay this amount right now?" A `dry_run` flag exists on `send_payment`, but we tested it directly against live FNN v0.8.1 nodes and confirmed it does not help: dry-run sessions return `Created` immediately with no route detail, and are never queryable afterward, not even the instant after creation (`get_payment` returns `Payment session not found`). Whatever data a real router computes during a dry run is discarded, not surfaced.
 
-Every wallet, checkout flow, and payment bot built on Fiber runs into this same wall. `fnn-ts` is the SDK layer that solves it properly, and it does so two ways, because there are two different questions a developer actually needs answered.
+Every wallet, checkout flow, and payment bot built on Fiber runs into this same wall. `fiberprobe` is the SDK layer that solves it properly, and it does so two ways, because there are two different questions a developer actually needs answered.
 
 ## Two tiers, because one estimate isn't enough
 
@@ -54,7 +58,7 @@ None of these would have surfaced from reading documentation. They surfaced from
 ## Quick start
 
 ```ts
-import { FiberClient, PaymentChecker } from 'fnn-ts'
+import { FiberClient, PaymentChecker } from 'fiberprobe'
 
 const client = new FiberClient('http://127.0.0.1:8227') // your FNN node's RPC address
 const checker = new PaymentChecker(client)
@@ -186,7 +190,7 @@ Open `http://localhost:5173`. The Vite dev server proxies `/rpc-alice`, `/rpc-bo
 
 Every wallet, merchant checkout, and payment bot that gets built on Fiber will hit the exact liquidity-visibility wall this SDK addresses, on day one of integration. Right now each of them would either reinvent this from scratch or ship with silent failure modes, exactly the kind of gap that makes a new payment network frustrating to build on.
 
-`fnn-ts` is meant to be the layer that sits between `fnn`'s RPC and application code, so that question doesn't have to be solved twice. It's typed, it's tested against real infrastructure rather than assumptions from documentation, and the failures it caught along the way (five of them, detailed above) are the kind that would otherwise ship silently into production and degrade user experience the first time someone hits an edge case.
+`fiberprobe` is meant to be the layer that sits between `fnn`'s RPC and application code, so that question doesn't have to be solved twice. It's typed, it's tested against real infrastructure rather than assumptions from documentation, and the failures it caught along the way (five of them, detailed above) are the kind that would otherwise ship silently into production and degrade user experience the first time someone hits an edge case.
 
 ---
 
@@ -194,4 +198,4 @@ Every wallet, merchant checkout, and payment bot that gets built on Fiber will h
 
 Category 2: Node, Routing & Diagnostics Infrastructure, "Gone in 60ms" Fiber Network Infrastructure Hackathon (July 2026).
 
-Repository: `github.com/Linnnetteseven/fnn-ts`
+Repository: `github.com/Linnnetteseven/fiberprobe`
