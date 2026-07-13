@@ -4,10 +4,9 @@ A TypeScript SDK for Fiber Network Node (FNN) that answers the question every pa
 
 Built for the "Gone in 60ms" Fiber Network Infrastructure Hackathon, Category 2: Node, Routing & Diagnostics.
 
-````bash
-npm install fiberprobe
-```
----
+`npm install fiberprobe`
+
+
 ## The problem
 
 Fiber, like Lightning, splits channel state into two categories. Total capacity is public, broadcast via gossip. The actual balance split between the two peers in a channel is private and changes with every payment. This is by design: publishing live balances would leak the entire financial graph of the network.
