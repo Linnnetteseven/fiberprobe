@@ -315,8 +315,8 @@ function Wordmark({ theme }: { theme: Theme }) {
     <img
       src={src}
       alt="Fiber Probe"
-      width={28}
-      height={28}
+      width={80}
+      height={80}
       style={{ display: 'block', objectFit: 'contain' }}
     />
   )
@@ -530,7 +530,7 @@ export default function App() {
         <div style={{ borderBottom: `1px solid ${C.border}` }}>
           <div className="fnn-header fnn-page-pad" style={{ maxWidth: 1200, margin: '0 auto', padding: '20px 32px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <Wordmark theme= {theme}/>
+              <Wordmark theme={theme} />
               <div>
                 <div className="fnn-logo" style={{
                   fontFamily: C.mono, fontSize: 26, fontWeight: 700, color: C.signal,
