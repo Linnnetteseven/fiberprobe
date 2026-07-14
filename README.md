@@ -1,6 +1,10 @@
 # fiberprobe
 
-A TypeScript SDK for Fiber Network Node (FNN) that answers the question every payment-channel application eventually asks: **will this payment actually go through?**
+**A TypeScript SDK for Fiber Network Node (FNN).**
+
+Fiber never publishes live channel liquidity — only total capacity. That means no wallet, checkout, or bot built on Fiber can safely ask *"will this payment actually go through?"* until now.
+
+fiberprobe answers that with a free static estimate and, when it matters, a live empirical probe that proves real liquidity on the exact route, right now.
 
 Built for the "Gone in 60ms" Fiber Network Infrastructure Hackathon — Category 2: Node, Routing & Diagnostics.
 
