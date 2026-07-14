@@ -309,17 +309,16 @@ function ThemeToggle({ theme, onToggle }: { theme: Theme; onToggle: () => void }
 }
 
 // ── Wordmark ────────────────────────────────────────────────────────────────
-// Drop-in point for a real logo asset: replace the <svg> below with
-// `<img src="/logo.svg" width={28} height={28} alt="" />` once it's added
-// to /public.
-function Wordmark() {
+function Wordmark({ theme }: { theme: Theme }) {
+  const src = theme === 'dark' ? '/logofp-nobg.png' : '/logolight-nobg.png'
   return (
-    <svg width="26" height="26" viewBox="0 0 26 26" fill="none" aria-hidden="true">
-      <rect x="1" y="16" width="4" height="9" rx="1" fill={C.border} />
-      <rect x="8" y="10" width="4" height="15" rx="1" fill={C.muted} />
-      <rect x="15" y="5" width="4" height="20" rx="1" fill={C.signal} />
-      <rect x="22" y="0" width="4" height="25" rx="1" fill={C.signal} opacity="0.5" />
-    </svg>
+    <img
+      src={src}
+      alt="Fiber Probe"
+      width={28}
+      height={28}
+      style={{ display: 'block', objectFit: 'contain' }}
+    />
   )
 }
 
@@ -531,7 +530,7 @@ export default function App() {
         <div style={{ borderBottom: `1px solid ${C.border}` }}>
           <div className="fnn-header fnn-page-pad" style={{ maxWidth: 1200, margin: '0 auto', padding: '20px 32px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <Wordmark />
+              <Wordmark theme= {theme}/>
               <div>
                 <div className="fnn-logo" style={{
                   fontFamily: C.mono, fontSize: 26, fontWeight: 700, color: C.signal,
