@@ -10,6 +10,7 @@ export default defineConfig({
     },
   },
   server: {
+     allowedHosts: ['.trycloudflare.com'],
     proxy: {
       '/rpc-alice': {
         target: 'http://127.0.0.1:8227',

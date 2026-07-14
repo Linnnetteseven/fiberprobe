@@ -2,11 +2,14 @@
 
 A TypeScript SDK for Fiber Network Node (FNN) that answers the question every payment-channel application eventually asks: **will this payment actually go through?**
 
-Built for the "Gone in 60ms" Fiber Network Infrastructure Hackathon, Category 2: Node, Routing & Diagnostics.
+Built for the "Gone in 60ms" Fiber Network Infrastructure Hackathon — Category 2: Node, Routing & Diagnostics.
 
-````bash
+Install:
+
+```bash
 npm install fiberprobe
 ```
+
 ---
 ## The problem
 
