@@ -14,7 +14,22 @@ const aliceChecker = new PaymentChecker(alice)
 const bobChecker   = new PaymentChecker(bob)
 
 // ── Design tokens ──────────────────────────────────────────────────────────
-const C = {
+// Two palettes, one shape. `C` is swapped in place on every render so every
+// component below can keep reading plain `C.x` without prop drilling.
+type Theme = 'dark' | 'light'
+
+interface Tokens {
+  bg: string; surface: string; surface2: string
+  border: string; borderHi: string
+  signal: string; signalDim: string; data: string
+  text: string; muted: string
+  good: string; warn: string; bad: string
+  goodBg: string; badBg: string; warnBg: string; warnBorder: string
+  onSignal: string
+  mono: string; sans: string
+}
+
+const darkTokens: Tokens = {
   bg:        '#080b10',
   surface:   '#0f1420',
   surface2:  '#141b2a',
@@ -24,13 +39,45 @@ const C = {
   signalDim: '#7a4a26',
   data:      '#5ec8d8',
   text:      '#e8edf5',
-  muted:     '#5b6b85',
+  muted:     '#8592a8',
   good:      '#4ade80',
   warn:      '#ff9d5c',
   bad:       '#f2555a',
-  mono:      "'IBM Plex Mono', ui-monospace, monospace",
-  sans:      "'Inter', system-ui, sans-serif",
+  goodBg:    '#0d2a1a',
+  badBg:     '#2a0d0f',
+  warnBg:    '#2a1a0c',
+  warnBorder:'#4a2e14',
+  onSignal:  '#1a0e05',
+  mono: "'IBM Plex Mono', ui-monospace, monospace",
+  sans: "'Inter', system-ui, sans-serif",
 }
+
+const lightTokens: Tokens = {
+  bg:        '#eef1f6',
+  surface:   '#ffffff',
+  surface2:  '#f4f6fb',
+  border:    '#dde3ee',
+  borderHi:  '#c3ccdd',
+  signal:    '#c96a2e',
+  signalDim: '#f3d9bd',
+  data:      '#0f7a8c',
+  text:      '#1a2332',
+  muted:     '#5b6b85',
+  good:      '#158a44',
+  warn:      '#c17a12',
+  bad:       '#d3383e',
+  goodBg:    '#e7f6ec',
+  badBg:     '#fbeaea',
+  warnBg:    '#fbf0dd',
+  warnBorder:'#edd6a8',
+  onSignal:  '#fff7f0',
+  mono: "'IBM Plex Mono', ui-monospace, monospace",
+  sans: "'Inter', system-ui, sans-serif",
+}
+
+// Mutable — reassigned (not replaced) at the top of App's render so every
+// helper component below always reads the palette for the active theme.
+const C: Tokens = { ...darkTokens }
 
 function fmtCkb(shannon: bigint | string): string {
   const n = typeof shannon === 'bigint' ? shannon : BigInt(shannon)
@@ -125,8 +172,10 @@ function HopTrace({ hopCount, resolved }: { hopCount: number; resolved: boolean 
 function Panel({ eyebrow, title, children }: { eyebrow: string; title: string; children: React.ReactNode }) {
   return (
     <div style={{
-      background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10,
+      background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12,
       padding: 26, display: 'flex', flexDirection: 'column', gap: 18,
+      boxShadow: '0 1px 2px rgba(0,0,0,0.06), 0 12px 32px -20px rgba(0,0,0,0.35)',
+      transition: 'background 0.25s ease, border-color 0.25s ease',
     }}>
       <div>
         <div style={{ fontFamily: C.mono, fontSize: 11, letterSpacing: '0.12em', color: C.data, textTransform: 'uppercase', marginBottom: 4 }}>
@@ -153,6 +202,7 @@ function Field({ value, onChange, placeholder, mono = true }: {
         background: C.bg, border: `1px solid ${C.border}`, borderRadius: 6,
         color: C.text, fontFamily: mono ? C.mono : C.sans, fontSize: 13,
         padding: '11px 13px', width: '100%', boxSizing: 'border-box', outline: 'none',
+        transition: 'background 0.25s ease, border-color 0.15s ease',
       }}
       onFocus={(e) => (e.target.style.borderColor = C.data)}
       onBlur={(e) => (e.target.style.borderColor = C.border)}
@@ -172,14 +222,15 @@ function Button({ onClick, disabled, children, variant = 'primary' }: {
         background: disabled ? C.border : isPrimary ? C.signal : 'transparent',
         border: isPrimary ? 'none' : `1px solid ${C.borderHi}`,
         borderRadius: 6,
-        color: disabled ? C.muted : isPrimary ? '#1a0e05' : C.text,
+        color: disabled ? C.muted : isPrimary ? C.onSignal : C.text,
         cursor: disabled ? 'not-allowed' : 'pointer',
         fontFamily: C.sans, fontSize: 13, fontWeight: 600,
         padding: '10px 18px', width: '100%',
-        transition: 'opacity 0.15s, transform 0.1s',
+        transition: 'opacity 0.15s, transform 0.1s, background 0.2s ease',
       }}
       onMouseDown={(e) => { if (!disabled) e.currentTarget.style.transform = 'scale(0.98)' }}
       onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)' }}
+      onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)' }}
     >
       {children}
     </button>
@@ -204,7 +255,7 @@ function IssueList({ issues }: { issues: string[] }) {
       {issues.map((issue, i) => (
         <div key={i} style={{
           fontFamily: C.mono, fontSize: 11.5, color: C.warn,
-          background: '#2a1a0c', border: `1px solid #4a2e14`,
+          background: C.warnBg, border: `1px solid ${C.warnBorder}`,
           borderRadius: 5, padding: '6px 10px', lineHeight: 1.5,
         }}>
           {issue}
@@ -229,9 +280,69 @@ const emptyRecipientState = (): RecipientState => ({
   invoice: '', payResult: null, probeResult: null, probeStep: 0,
 })
 
+// ── Theme toggle ────────────────────────────────────────────────────────────
+function ThemeToggle({ theme, onToggle }: { theme: Theme; onToggle: () => void }) {
+  const isDark = theme === 'dark'
+  return (
+    <button
+      onClick={onToggle}
+      aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+      title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+      style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        width: 34, height: 34, borderRadius: 8, cursor: 'pointer',
+        background: 'transparent', border: `1px solid ${C.border}`, color: C.muted,
+        transition: 'border-color 0.2s ease, color 0.2s ease',
+      }}
+    >
+      {isDark ? (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+        </svg>
+      ) : (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+        </svg>
+      )}
+    </button>
+  )
+}
+
+// ── Wordmark ────────────────────────────────────────────────────────────────
+// Drop-in point for a real logo asset: replace the <svg> below with
+// `<img src="/logo.svg" width={28} height={28} alt="" />` once it's added
+// to /public.
+function Wordmark() {
+  return (
+    <svg width="26" height="26" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+      <rect x="1" y="16" width="4" height="9" rx="1" fill={C.border} />
+      <rect x="8" y="10" width="4" height="15" rx="1" fill={C.muted} />
+      <rect x="15" y="5" width="4" height="20" rx="1" fill={C.signal} />
+      <rect x="22" y="0" width="4" height="25" rx="1" fill={C.signal} opacity="0.5" />
+    </svg>
+  )
+}
+
 // ── App ───────────────────────────────────────────────────────────────────────
 
 export default function App() {
+  const [theme, setTheme] = useState<Theme>(() => {
+    if (typeof window === 'undefined') return 'dark'
+    return (window.localStorage.getItem('fiberprobe-theme') as Theme | null) ?? 'dark'
+  })
+
+  // Swap the shared token object in place before this render's JSX is built,
+  // so every child below reads the palette for the theme just selected.
+  Object.assign(C, theme === 'light' ? lightTokens : darkTokens)
+
+  useEffect(() => {
+    document.title = 'Fiber Probe — route feasibility for the Fiber Network'
+  }, [])
+
+  useEffect(() => {
+    window.localStorage.setItem('fiberprobe-theme', theme)
+  }, [theme])
+
   const [aliceInfo, setAliceInfo] = useState<NodeInfo | null>(null)
   const [bobInfo, setBobInfo]     = useState<NodeInfo | null>(null)
   const [carolInfo, setCarolInfo] = useState<NodeInfo | null>(null)
@@ -372,7 +483,13 @@ export default function App() {
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" />
       <style>{`
-        html { scroll-behavior: smooth; }
+        html, body, #root {
+          margin: 0;
+          padding: 0;
+          min-height: 100%;
+          background: ${C.bg};
+        }
+        html { scroll-behavior: smooth; overscroll-behavior-y: none; color-scheme: ${theme}; }
         * { box-sizing: border-box; }
 
         @keyframes fnnFadeIn {
@@ -385,11 +502,16 @@ export default function App() {
           display: flex; align-items: center; justify-content: space-between;
           flex-wrap: wrap; gap: 14px;
         }
-        .fnn-pills { display: flex; gap: 18px; flex-wrap: wrap; }
+        .fnn-pills { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; }
         .fnn-grid {
           display: grid; grid-template-columns: 1fr 1fr; gap: 22px;
         }
         .fnn-stats-strip { display: flex; gap: 36px; flex-wrap: wrap; }
+
+        button:focus-visible, input:focus-visible {
+          outline: 2px solid ${C.data};
+          outline-offset: 2px;
+        }
 
         @media (max-width: 860px) {
           .fnn-grid { grid-template-columns: 1fr !important; }
@@ -403,37 +525,43 @@ export default function App() {
         }
       `}</style>
 
-      <div style={{ minHeight: '100vh', background: C.bg, color: C.text, fontFamily: C.sans, overflowX: 'hidden' }}>
+      <div style={{ minHeight: '100vh', background: C.bg, color: C.text, fontFamily: C.sans, overflowX: 'hidden', transition: 'background 0.25s ease, color 0.25s ease' }}>
 
         {/* Header */}
-        <div className="fnn-header fnn-page-pad" style={{ borderBottom: `1px solid ${C.border}`, padding: '20px 32px' }}>
-          <div>
-            <div className="fnn-logo" style={{
-              fontFamily: C.mono, fontSize: 30, fontWeight: 700, color: C.signal,
-              textShadow: `0 0 20px ${C.signal}66`, letterSpacing: '-0.01em', lineHeight: 1,
-            }}>
-              Fiber Probe
+        <div style={{ borderBottom: `1px solid ${C.border}` }}>
+          <div className="fnn-header fnn-page-pad" style={{ maxWidth: 1200, margin: '0 auto', padding: '20px 32px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <Wordmark />
+              <div>
+                <div className="fnn-logo" style={{
+                  fontFamily: C.mono, fontSize: 26, fontWeight: 700, color: C.signal,
+                  letterSpacing: '-0.01em', lineHeight: 1,
+                }}>
+                  Fiber Probe
+                </div>
+                <div className="fnn-tagline" style={{ color: C.muted, fontSize: 13, marginTop: 6 }}>
+                  Know whether a Fiber payment will succeed before you send it
+                </div>
+              </div>
             </div>
-            <div className="fnn-tagline" style={{ color: C.muted, fontSize: 13, marginTop: 6 }}>
-              TypeScript SDK for Fiber Network Node · static estimate + live HTLC probing
+            <div className="fnn-pills">
+              <NodePill label="alice" pubkey={aliceInfo?.pubkey} online={!!aliceInfo} />
+              <NodePill label="bob" pubkey={bobInfo?.pubkey} online={!!bobInfo} />
+              <NodePill label="carol" pubkey={carolInfo?.pubkey} online={!!carolInfo} />
+              <ThemeToggle theme={theme} onToggle={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))} />
             </div>
-          </div>
-          <div className="fnn-pills">
-            <NodePill label="alice" pubkey={aliceInfo?.pubkey} online={!!aliceInfo} />
-            <NodePill label="bob" pubkey={bobInfo?.pubkey} online={!!bobInfo} />
-            <NodePill label="carol" pubkey={carolInfo?.pubkey} online={!!carolInfo} />
           </div>
         </div>
 
         {/* Node stats strip */}
         {aliceInfo && bobInfo && carolInfo && (
-          <div className="fnn-stats-strip fnn-page-pad" style={{
-            background: C.surface2, borderBottom: `1px solid ${C.border}`, padding: '10px 32px',
-          }}>
-            <StatRow label="alice channels" value={String(parseInt(String(aliceInfo.channel_count), 16))} />
-            <StatRow label="bob channels" value={String(parseInt(String(bobInfo.channel_count), 16))} />
-            <StatRow label="carol channels" value={String(parseInt(String(carolInfo.channel_count), 16))} />
-            <StatRow label="fnn version" value={aliceInfo.version} colour={C.data} />
+          <div style={{ background: C.surface2, borderBottom: `1px solid ${C.border}`, transition: 'background 0.25s ease' }}>
+            <div className="fnn-stats-strip fnn-page-pad" style={{ maxWidth: 1200, margin: '0 auto', padding: '10px 32px' }}>
+              <StatRow label="alice channels" value={String(parseInt(String(aliceInfo.channel_count), 16))} />
+              <StatRow label="bob channels" value={String(parseInt(String(bobInfo.channel_count), 16))} />
+              <StatRow label="carol channels" value={String(parseInt(String(carolInfo.channel_count), 16))} />
+              <StatRow label="fnn version" value={aliceInfo.version} colour={C.data} />
+            </div>
           </div>
         )}
 
@@ -455,7 +583,7 @@ export default function App() {
                     flex: 1, padding: '9px 10px', borderRadius: 6, cursor: 'pointer',
                     fontFamily: C.mono, fontSize: 11.5, fontWeight: 600,
                     background: recipient === 'bob' ? C.signal : 'transparent',
-                    color: recipient === 'bob' ? '#1a0e05' : C.muted,
+                    color: recipient === 'bob' ? C.onSignal : C.muted,
                     border: `1px solid ${recipient === 'bob' ? C.signal : C.border}`,
                     transition: 'background 0.2s ease, color 0.2s ease, border-color 0.2s ease',
                   }}
@@ -468,7 +596,7 @@ export default function App() {
                     flex: 1, padding: '9px 10px', borderRadius: 6, cursor: 'pointer',
                     fontFamily: C.mono, fontSize: 11.5, fontWeight: 600,
                     background: recipient === 'carol' ? C.signal : 'transparent',
-                    color: recipient === 'carol' ? '#1a0e05' : C.muted,
+                    color: recipient === 'carol' ? C.onSignal : C.muted,
                     border: `1px solid ${recipient === 'carol' ? C.signal : C.border}`,
                     transition: 'background 0.2s ease, color 0.2s ease, border-color 0.2s ease',
                   }}
@@ -559,7 +687,7 @@ export default function App() {
                             <div style={{
                               display: 'inline-flex', alignItems: 'center', gap: 8,
                               padding: '8px 14px', borderRadius: 6, width: 'fit-content',
-                              background: current.probeResult.isViable ? '#0d2a1a' : '#2a0d0f',
+                              background: current.probeResult.isViable ? C.goodBg : C.badBg,
                               border: `1px solid ${current.probeResult.isViable ? C.good : C.bad}`,
                             }}>
                               <span style={{
@@ -617,7 +745,6 @@ export default function App() {
                   <div style={{
                     fontFamily: C.mono, fontSize: 26, fontWeight: 600,
                     color: rxResult.canReceive ? C.good : C.bad,
-                    textShadow: `0 0 14px ${rxResult.canReceive ? C.good : C.bad}44`,
                   }}>
                     {rxResult.canReceive ? 'CLEARS' : 'INSUFFICIENT'}
                   </div>
@@ -692,8 +819,8 @@ function NodePill({ label, pubkey, online }: { label: string; pubkey?: string; o
     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
       <div style={{
         width: 7, height: 7, borderRadius: '50%',
-        background: online ? '#4ade80' : '#f2555a',
-        boxShadow: online ? '0 0 6px #4ade8099' : 'none',
+        background: online ? C.good : C.bad,
+        boxShadow: online ? `0 0 6px ${C.good}99` : 'none',
       }} />
       <span style={{ fontFamily: C.mono, fontSize: 11.5, color: C.text, textTransform: 'uppercase' }}>
         {label}
