@@ -1,6 +1,6 @@
 {
   "name": "fiberprobe",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "TypeScript SDK for Fiber Network Node (FNN) — typed RPC client, static route estimation, live HTLC-based liquidity probing, inbound capacity checks, and event-driven payment lifecycle.",
   "type": "module",
   "main": "./dist/index.js",
